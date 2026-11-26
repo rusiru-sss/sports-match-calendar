@@ -144,6 +144,62 @@ for sport_path, league, sport in leagues:
 
 # Deduplicate cross-provider matches by local day and normalized participants.
 import re
+
+# SofaScore scheduled-event fallback. Public endpoints may restrict automated access.
+country_codes = {"sri lanka":"LK","india":"IN","pakistan":"PK","england":"GB","australia":"AU","south africa":"ZA","new zealand":"NZ","bangladesh":"BD","west indies":"WI","afghanistan":"AF","ireland":"IE","zimbabwe":"ZW","scotland":"GB","wales":"GB","france":"FR","germany":"DE","spain":"ES","italy":"IT","argentina":"AR","brazil":"BR","portugal":"PT","japan":"JP","netherlands":"NL","united states":"US","usa":"US","canada":"CA","fiji":"FJ","samoa":"WS","tonga":"TO","nepal":"NP","namibia":"NA","oman":"OM","united arab emirates":"AE","belgium":"BE","croatia":"HR","morocco":"MA","uruguay":"UY","mexico":"MX","switzerland":"CH","denmark":"DK","norway":"NO","sweden":"SE","poland":"PL","south korea":"KR"}
+def national_code(name):
+    n = name.lower().strip()
+    n = re.sub(r"\s+(women|men|u19|u20|u21|u23|under-19|under-20|under-21)$", "", n)
+    return country_codes.get(n, "")
+sofa_counts = {}
+for slug, sport in [("cricket","Cricket"),("football","Soccer"),("rugby","Rugby"),("motorsport","Formula 1")]:
+    cursor = first
+    while cursor <= last:
+        try:
+            url = f"https://www.sofascore.com/api/v1/sport/{slug}/scheduled-events/{cursor.isoformat()}"
+            response = session.get(url, timeout=12, headers={"User-Agent":"Mozilla/5.0","Accept":"application/json"})
+            response.raise_for_status()
+            for e in response.json().get("events", []):
+                if not e.get("startTimestamp"):
+                    continue
+                dt = datetime.fromtimestamp(e["startTimestamp"], timezone.utc)
+                if not first <= dt.astimezone(ZoneInfo("Asia/Colombo")).date() <= last:
+                    continue
+                h, a = e.get("homeTeam") or {}, e.get("awayTeam") or {}
+                home, away = h.get("name",""), a.get("name","")
+                t = e.get("tournament") or {}
+                league = t.get("name","Other")
+                if slug == "motorsport" and not any(x in league.lower() for x in ["formula 1","formula one","f1"]):
+                    continue
+                key = "sofa:" + str(e["id"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                status = (e.get("status") or {}).get("type","")
+                hc, ac = national_code(home), national_code(away)
+                national = bool(hc and ac and (h.get("national") or a.get("national") or sport == "Cricket" or "international" in league.lower()))
+                matches.append({"event_id":key,"sport":sport,"tournament_name":league,"event_name":home+" vs "+away,
+                    "participant_1":home,"participant_2":away,"start_time":dt.isoformat(),"time_precision":"exact",
+                    "status":"finished" if status=="finished" else "cancelled" if status=="canceled" else "scheduled",
+                    "is_country_match":national,"participant_1_country_code":hc if national else "",
+                    "participant_2_country_code":ac if national else "",
+                    "promotion_signal":"Monitor","promotion_score":20,"promotion_reasons":["SofaScore schedule listing"],
+                    "source":"SofaScore","source_url":"https://www.sofascore.com/"})
+                sofa_counts[sport] = sofa_counts.get(sport,0)+1
+        except (requests.RequestException, ValueError, TypeError, AttributeError, KeyError) as exc:
+            errors.append(f"SofaScore {slug} {cursor}: {exc}")
+            if getattr(getattr(exc,"response",None),"status_code",None) in (401,403,429):
+                break
+        cursor += timedelta(days=1)
+        time.sleep(0.15)
+print("SofaScore fixture counts:", sofa_counts)
+# Flag recognized national sides only; never infer flags from club-name substrings.
+for m in matches:
+    hc, ac = national_code(m.get("participant_1","")), national_code(m.get("participant_2",""))
+    if hc and ac and m["sport"] in ("Cricket","Soccer","Rugby"):
+        m["is_country_match"] = True
+        m["participant_1_country_code"], m["participant_2_country_code"] = hc, ac
+
 def norm(s):
     return re.sub(r"[^a-z0-9]", "", s.lower())
 unique = {}
@@ -165,7 +221,7 @@ out = {"generated_at_local": datetime.now(timezone.utc).isoformat(),
        "matches": matches,
        "provider_health": {sport: {"status": "warning" if errors else "ok",
            "count": sum(m["sport"] == sport for m in matches),
-           "provider": "ESPN + TheSportsDB (partial coverage)"}
+           "provider": "ESPN + TheSportsDB + SofaScore (partial coverage)"}
            for sport in SPORTS.values()},
        "feed_warnings": errors[:20]}
 Path("data").mkdir(exist_ok=True)
