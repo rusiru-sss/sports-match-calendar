@@ -531,14 +531,23 @@ def parse_cricschedule_month(month):
         if len(cells) < 2:
             continue
         row = " | ".join(cells)
-        dm = re.search(r"(Oct\s+\d{1,2},?\s+2026|2026-10-(\d{2}))", row, re.I)
-        if not dm:
+        # Match the requested month/year, not the original October 2026 window.
+        dm = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", cells[0])
+        if dm:
+            if (int(dm.group(1)), int(dm.group(2))) != (y, m):
+                continue
+            day_num = int(dm.group(3))
+        else:
+            dm = re.search(r"\b" + datetime(y,m,1).strftime("%b") + r"\s+(\d{1,2})\b", cells[0], re.I)
+            if not dm:
+                continue
+            day_num = int(dm.group(1))
+        try:
+            day = datetime(y,m,day_num).strftime("%Y-%m-%d")
+        except ValueError:
             continue
-        date_text = dm.group(1)
-        day_num = int(date_text[-2:]) if date_text.startswith("2026-10-") else int(re.search(r"(\d{1,2})", date_text).group(1))
-        day = f"{y:04d}-{m:02d}-{day_num:02d}"
 
-        mm = re.search(r"([A-Za-z][^|,]+?)\s+vs\s+([A-Za-z][^|,]+?)\s*,\s*[^|]*?\b(\d+|Final|Semi[- ]?final|Qualifier)?\s*(T20I?|ODI|Test|T20|Twenty20|One[- ]?Day)\b", row, re.I)
+        mm = re.search(r"([A-Za-z][^|,]+?)\s+vs\s+([A-Za-z][^|,]+?)\s*,\s*[^|]*?\b(\d+|Final|Semi[- ]?final|Qualifier)?\s*(T20I?|ODI|Test|T20|Twenty20|One[- ]?Day)\b", cells[1], re.I)
         if not mm:
             continue
         p1, p2 = clean(mm.group(1)), clean(mm.group(2))
@@ -568,7 +577,7 @@ def parse_cricschedule_month(month):
             p1, p2,
             {"name":p1,"country_code":alpha2_for_name(p1),"is_national":preferred_cricket_country(p1)},
             {"name":p2,"country_code":alpha2_for_name(p2),"is_national":preferred_cricket_country(p2)},
-            11
+            11, "exact" if tm else "date_only"
         )
         if x:
             x["format"] = fmt
