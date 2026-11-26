@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '27 3 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install 'requests>=2.31,<3'
-      - name: Fetch current and next month fixtures
-        run: python scripts/build_matches.py
-        env:
-          SPORTSDB_API_KEY: ${{ secrets.SPORTSDB_API_KEY }}
+      - name: Validate collector syntax
+        run: python -m py_compile scripts/fallback_feeds.py
+      - name: Fetch rolling two-month fixtures with provider fallback
+        run: python scripts/fallback_feeds.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
