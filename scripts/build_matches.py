@@ -14,7 +14,8 @@ KEY = os.getenv("SPORTSDB_API_KEY") or "123"
 SPORTS = {"Soccer": "Soccer", "Cricket": "Cricket", "Tennis": "Tennis",
           "Basketball": "Basketball", "Rugby": "Rugby", "Motorsport": "Formula 1",
           "Boxing": "Boxing", "Badminton": "Badminton", "Volleyball": "Volleyball"}
-TODAY = date.today()
+from zoneinfo import ZoneInfo
+TODAY = datetime.now(ZoneInfo("Asia/Colombo")).date()
 MONTHS = [(TODAY.year, TODAY.month)]
 MONTHS.append((TODAY.year + (TODAY.month == 12), TODAY.month % 12 + 1))
 session = requests.Session()
@@ -84,6 +85,77 @@ for year, month in MONTHS:
             errors.append(day + ": " + str(exc))
         time.sleep(0.18)
 
+
+# Additional ESPN scoreboard feeds, queried in weekly windows.
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+leagues = [
+    ("soccer", "eng.1", "Soccer"), ("soccer", "esp.1", "Soccer"),
+    ("soccer", "ger.1", "Soccer"), ("soccer", "ita.1", "Soccer"),
+    ("soccer", "fra.1", "Soccer"), ("soccer", "uefa.champions", "Soccer"),
+    ("basketball", "nba", "Basketball"), ("basketball", "wnba", "Basketball"),
+    ("tennis", "atp", "Tennis"), ("tennis", "wta", "Tennis"),
+    ("racing", "f1", "Formula 1"), ("rugby", "164205", "Rugby"),
+    ("cricket", "8048", "Cricket"),
+]
+first = date(MONTHS[0][0], MONTHS[0][1], 1)
+last = date(MONTHS[-1][0], MONTHS[-1][1], calendar.monthrange(*MONTHS[-1])[1])
+espn_counts = {}
+for sport_path, league, sport in leagues:
+    cursor = first
+    while cursor <= last:
+        end = min(cursor + timedelta(days=6), last)
+        dates = cursor.strftime("%Y%m%d") + "-" + end.strftime("%Y%m%d")
+        try:
+            url = f"https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/scoreboard"
+            response = session.get(url, params={"dates": dates, "limit": 1000}, timeout=20)
+            response.raise_for_status()
+            payload = response.json()
+            for event in payload.get("events", []):
+                for comp in event.get("competitions") or [event]:
+                    stamp = comp.get("date") or event.get("date")
+                    if not stamp:
+                        continue
+                    dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                    if dt.tzinfo is None or not first <= dt.astimezone(ZoneInfo("Asia/Colombo")).date() <= last:
+                        continue
+                    key = "espn:" + sport_path + ":" + str(comp.get("id") or event.get("id"))
+                    if key in seen:
+                        continue
+                    teams = [t.get("team", t.get("athlete", {})).get("displayName", "") for t in comp.get("competitors", [])]
+                    home, away = (teams + ["", ""])[:2]
+                    name = event.get("name") or event.get("shortName") or " vs ".join(teams)
+                    status = comp.get("status", event.get("status", {})).get("type", {})
+                    links = event.get("links") or []
+                    tournament = (payload.get("leagues") or [{}])[0].get("name") or league
+                    seen.add(key)
+                    matches.append({"event_id": key, "sport": sport, "tournament_name": tournament,
+                        "event_name": name, "participant_1": home, "participant_2": away,
+                        "start_time": stamp, "time_precision": "exact",
+                        "status": "cancelled" if "cancel" in status.get("name", "").lower() else "finished" if status.get("completed") else "scheduled",
+                        "promotion_signal": "Monitor", "promotion_score": 20,
+                        "promotion_reasons": ["ESPN schedule listing"], "is_country_match": False,
+                        "source": "ESPN", "source_url": links[0].get("href", "") if links else ""})
+                    espn_counts[sport] = espn_counts.get(sport, 0) + 1
+        except (requests.RequestException, ValueError, AttributeError, TypeError) as exc:
+            errors.append(f"ESPN {league} {dates}: {exc}")
+        cursor = end + timedelta(days=1)
+        time.sleep(0.12)
+
+# Deduplicate cross-provider matches by local day and normalized participants.
+import re
+def norm(s):
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+unique = {}
+for m in matches:
+    teams = sorted([norm(m.get("participant_1", "")), norm(m.get("participant_2", ""))])
+    day = datetime.fromisoformat(m["start_time"].replace("Z", "+00:00")).astimezone(ZoneInfo("Asia/Colombo")).date()
+    key = (m["sport"], str(day), *teams) if all(teams) else (m["event_id"],)
+    if key not in unique or m["source"] == "ESPN":
+        unique[key] = m
+matches = list(unique.values())
+print("ESPN fixture counts:", espn_counts)
+
 matches.sort(key=lambda m: m["start_time"])
 if errors and not matches:
     raise SystemExit("All sports feed requests failed; refusing empty deployment: " + "; ".join(errors[:3]))
@@ -93,7 +165,7 @@ out = {"generated_at_local": datetime.now(timezone.utc).isoformat(),
        "matches": matches,
        "provider_health": {sport: {"status": "warning" if errors else "ok",
            "count": sum(m["sport"] == sport for m in matches),
-           "provider": "TheSportsDB (limited free API coverage)"}
+           "provider": "ESPN + TheSportsDB (partial coverage)"}
            for sport in SPORTS.values()},
        "feed_warnings": errors[:20]}
 Path("data").mkdir(exist_ok=True)
