@@ -62,7 +62,7 @@ button,input,select{font:inherit}.app{max-width:1540px;margin:auto;padding:26px 
 </section>
 
 <section class="card panel">
-  <div class="head"><div><div class="ptitle">📋 Match inventory</div><div class="psub" id="resultMeta">Loading…</div></div><div class="tabs"><button class="tab active" data-range="today">Today</button><button class="tab" data-range="next7">Next 7 Days</button><button class="tab" data-range="month">Entire Month</button></div></div>
+  <div class="head"><div><div class="ptitle">📋 Match inventory</div><div class="psub" id="resultMeta">Loading…</div></div><div class="tabs"><button class="tab active" data-range="today">Today</button><button class="tab" data-range="next7">Next 7 Days</button><button class="tab" data-range="month">Entire Month</button><button class="tab" data-range="nextMonth">Next Month</button></div></div>
   <div class="toolbar"><input class="search" id="search" placeholder="Search teams, players, competition or sport…"><select class="select" id="sportFilter"><option>All Sports</option></select><select class="select" id="signalFilter"><option>All Signals</option><option>Promote</option><option>Consider</option><option>Monitor</option></select></div>
   <div class="table-wrap"><table><thead><tr><th>Date</th><th>Time · IST</th><th>Category</th><th>Tournament</th><th>Match / Event</th><th>Signal</th><th>Score</th></tr></thead><tbody id="rows"></tbody></table></div>
 </section>
@@ -76,7 +76,7 @@ button,input,select{font:inherit}.app{max-width:1540px;margin:auto;padding:26px 
 </main>
 
 <script>
-var TZ="Asia/Colombo",state={matches:[],data:null,range:"today"},$=function(id){return document.getElementById(id)};
+var TZ="Asia/Colombo",state={matches:[],data:null,range:"today",selectedMonth:null},$=function(id){return document.getElementById(id)};
 var icon={Cricket:"🏏",Soccer:"⚽",Tennis:"🎾",Basketball:"🏀",Rugby:"🏉","Formula 1":"🏎️",Esports:"🎮",Boxing:"🥊",Badminton:"🏸",Volleyball:"🏐","Horse Racing":"🏇"};
 var countryVisualCodes={"england":"gb-eng","scotland":"gb-sct","wales":"gb-wls","west indies":"","sri lanka":"lk","india":"in","pakistan":"pk","australia":"au","south africa":"za","new zealand":"nz","bangladesh":"bd","afghanistan":"af","ireland":"ie","zimbabwe":"zw","namibia":"na","united arab emirates":"ae","nepal":"np","oman":"om","france":"fr","germany":"de","spain":"es","italy":"it","portugal":"pt","brazil":"br","argentina":"ar","japan":"jp","south korea":"kr","china":"cn","hong kong":"hk","taiwan":"tw","canada":"ca","usa":"us","turkey":"tr","switzerland":"ch","belgium":"be","czech republic":"cz","czechia":"cz","greece":"gr","romania":"ro","serbia":"rs","croatia":"hr","slovenia":"si","slovakia":"sk","hungary":"hu","poland":"pl"};
 var countryCodes={"sri lanka":"LK","india":"IN","pakistan":"PK","england":"GB","australia":"AU","south africa":"ZA","new zealand":"NZ","bangladesh":"BD","west indies":"WI","afghanistan":"AF","ireland":"IE","zimbabwe":"ZW","namibia":"NA","uae":"AE","united arab emirates":"AE","nepal":"NP","oman":"OM","scotland":"GB","netherlands":"NL","france":"FR","germany":"DE","spain":"ES","italy":"IT","portugal":"PT","brazil":"BR","argentina":"AR","japan":"JP","south korea":"KR","china":"CN","hong kong":"HK","taiwan":"TW","canada":"CA","usa":"US","united states":"US","turkey":"TR","switzerland":"CH","belgium":"BE","czech republic":"CZ","czechia":"CZ","greece":"GR","romania":"RO","serbia":"RS","croatia":"HR","slovenia":"SI","slovakia":"SK","hungary":"HU","poland":"PL"};
@@ -89,6 +89,7 @@ function localDateLabel(iso){return new Intl.DateTimeFormat("en-GB",{timeZone:TZ
 function localDay(iso){return new Intl.DateTimeFormat("en-GB",{timeZone:TZ,weekday:"short"}).format(new Date(iso))}
 function localTime(iso){return new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(iso))}
 function nowText(){return new Intl.DateTimeFormat("en-GB",{timeZone:TZ,weekday:"short",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date())}
+function nextMonthKey(){var p=dateKey().slice(0,7).split("-").map(Number);return new Date(Date.UTC(p[0],p[1],1)).toISOString().slice(0,7)}
 function next7(iso){var n=Date.now(),t=new Date(iso).getTime();return t>=n&&t<n+604800000}
 function flag(code){if(!code||code.length!==2)return"";return String.fromCodePoint.apply(null,code.toUpperCase().split("").map(function(c){return 127397+c.charCodeAt(0)}))}
 function inferFlagCode(name){
@@ -132,15 +133,16 @@ function cats(el,counts){
   $(el).innerHTML=arr.length?arr.map(function(x){return '<div class="cat"><div class="cat-top"><div class="cat-name">'+(icon[x[0]]||"•")+' '+esc(x[0])+'</div><div class="cat-count">'+x[1]+'</div></div><div class="track"><div class="fill" style="width:'+Math.max(2,x[1]/max*100)+'%"></div></div></div>'}).join(""):'<div class="empty-box">No data.</div>';
 }
 function render(){
-  var today=dateKey(),a=state.data&&state.data.analytics?state.data.analytics:{},month=state.data?state.data.target_month:today.slice(0,7);
+  var today=dateKey(),month=state.range==="nextMonth"?nextMonthKey():today.slice(0,7),months=state.data&&state.data.months||{},a=months[month]&&months[month].analytics||state.data&&state.data.analytics||{};
+  var monthMatches=state.matches.filter(function(x){return localDate(x.start_time).slice(0,7)===month});
   $("now").textContent=nowText()+" · IST / SL";
-  $("kToday").textContent=a.today_match_count!=null?a.today_match_count:state.matches.filter(function(x){return localDate(x.start_time)===today}).length;
-  $("kMonth").textContent=a.month_match_count!=null?a.month_match_count:state.matches.length;
+  $("kToday").textContent=state.matches.filter(function(x){return localDate(x.start_time)===today}).length;
+  $("kMonth").textContent=monthMatches.length;
   $("kWeek").textContent=state.matches.filter(function(x){return next7(x.start_time)}).length;
   $("kPromote").textContent=state.matches.filter(function(x){return localDate(x.start_time)===today&&isPromoCricket(x)&&x.promotion_signal==="Promote"}).length;
   var md=new Date(month+"-01T00:00:00Z");
   $("monthLabel").textContent=new Intl.DateTimeFormat("en-US",{month:"long",year:"numeric"}).format(md);
-  $("monthBadge").textContent=(a.month_match_count||state.matches.length)+" matches";
+  $("monthBadge").textContent=monthMatches.length+" matches";
   var eligible=state.matches.filter(function(x){ return isPromoCricket(x)&&new Date(x.start_time)>new Date(); }).sort(function(a,b){return new Date(a.start_time)-new Date(b.start_time)});
   var todayRows=eligible.filter(function(x){return localDate(x.start_time)===today}).sort(function(a,b){return (b.promotion_score||0)-(a.promotion_score||0)});
   var boardRows=todayRows.slice(0,6),boardFallback=false;
@@ -157,24 +159,24 @@ function render(){
   $("hero").previousElementSibling.querySelector(".psub").textContent=boardFallback?"No qualifying cricket fixture today — next available priority country fixtures are shown":"Sri Lanka + high-interest international cricket nations only";
   var tc={};state.matches.filter(function(x){return x.status!=="finished"&&x.status!=="cancelled"&&localDate(x.start_time)===today}).forEach(function(x){tc[x.sport]=(tc[x.sport]||0)+1});
   cats("todayCats",tc);
-  cats("monthCats",a.sport_month_counts||{});
-  var dc=a.daily_counts||{},days=Object.keys(dc).sort(),max=Math.max.apply(null,[1].concat(days.map(function(d){return dc[d]})));
+  var monthSports={};monthMatches.forEach(function(x){monthSports[x.sport]=(monthSports[x.sport]||0)+1});cats("monthCats",monthSports);
+  var dc={};monthMatches.forEach(function(x){var d=localDate(x.start_time);dc[d]=(dc[d]||0)+1});var days=Object.keys(dc).sort(),max=Math.max.apply(null,[1].concat(days.map(function(d){return dc[d]})));
   $("monthChart").innerHTML=days.length?days.map(function(d){return '<div class="bar-col"><div class="bar-v">'+dc[d]+'</div><div class="bar" style="height:'+Math.max(4,dc[d]/max*105)+'px"></div><div class="bar-l">'+d.slice(8)+'</div></div>'}).join(""):'<div class="empty-box">No volume data.</div>';
   renderRows();renderCoverage();
   $("updated").textContent="Last refresh "+(state.data&&state.data.generated_at_local?new Intl.DateTimeFormat("en-GB",{timeZone:TZ,dateStyle:"medium",timeStyle:"short"}).format(new Date(state.data.generated_at_local)):"—");
-  $("sourceNote").textContent=state.matches.length.toLocaleString()+" total month inventory · completed fixtures hidden from lists · SofaScore + ESPNcricinfo + Flashscore";
+  $("sourceNote").textContent=state.matches.length.toLocaleString()+" rolling two-month inventory · completed fixtures hidden from lists · SofaScore + ESPNcricinfo + Flashscore";
 }
 function populateSports(){
   var list=[...new Set(state.matches.map(function(x){return x.sport}))].sort(function(a,b){if(a==="Cricket")return -1;if(b==="Cricket")return 1;return a.localeCompare(b)});
   $("sportFilter").innerHTML='<option>All Sports</option>'+list.map(function(s){return '<option>'+esc(s)+'</option>'}).join("");
 }
 function renderRows(){
-  var q=$("search").value.toLowerCase(),sf=$("sportFilter").value,sg=$("signalFilter").value,today=dateKey(),month=today.slice(0,7);
+  var q=$("search").value.toLowerCase(),sf=$("sportFilter").value,sg=$("signalFilter").value,today=dateKey(),month=(state.range==="nextMonth"?nextMonthKey():today.slice(0,7));
   var rows=state.matches.filter(function(x){
     var d=localDate(x.start_time),rangeOk=state.range==="today"?d===today:state.range==="next7"?next7(x.start_time):d.slice(0,7)===month;
     return rangeOk&&x.status!=="finished"&&x.status!=="cancelled"&&(sf==="All Sports"||x.sport===sf)&&(sg==="All Signals"||x.promotion_signal===sg)&&JSON.stringify(x).toLowerCase().indexOf(q)>=0;
   }).sort(function(a,b){return new Date(a.start_time)-new Date(b.start_time)});
-  $("resultMeta").textContent="Showing "+rows.length.toLocaleString()+" individual matches · "+(state.range==="today"?"today":state.range==="next7"?"next 7 days":"entire current month");
+  $("resultMeta").textContent="Showing "+rows.length.toLocaleString()+" individual matches · "+(state.range==="today"?"today":state.range==="next7"?"next 7 days":state.range==="nextMonth"?"next month":"entire current month");
   $("rows").innerHTML=rows.length?rows.map(function(x){
     var u=x.source_url?'<a href="'+esc(x.source_url)+'" target="_blank" rel="noreferrer">'+eventName(x)+'</a>':eventName(x);
     return '<tr><td><div class="date-main">'+localDateLabel(x.start_time)+'</div><div class="date-sub">'+localDay(x.start_time)+'</div></td><td><div class="time">'+(x.time_precision==="date_only"?"TBD":localTime(x.start_time))+'</div><div class="tiny">IST / SL</div></td><td><div class="sport-cell">'+(icon[x.sport]||"•")+' '+esc(x.sport)+'</div>'+((x.sport==="Esports"&&(x.game||x.sport_detail))?'<div class="tournament-line">'+esc(x.game||x.sport_detail)+'</div>':'')+'</td><td><div class="comp">'+esc(x.tournament_name||x.competition||"Unknown")+'</div></td><td><div class="event">'+u+'</div></td><td><span class="sig '+sigClass(x.promotion_signal)+'">'+esc(x.promotion_signal)+'</span></td><td><div class="score">'+Math.round(Number(x.promotion_score||0))+'/100</div><span class="why">'+esc((x.promotion_reasons||[]).slice(0,3).join(" · ")||"general inventory")+'</span></td></tr>';
@@ -192,7 +194,7 @@ async function load(){
     var r=await fetch("data/matches.json?ts="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("missing");
     state.data=await r.json();state.matches=Array.isArray(state.data)?state.data:(state.data.matches||[]);populateSports();render();
   }catch(e){
-    state.data=null;state.matches=[];$("sourceNote").textContent="Data file unavailable. Run the GitHub Actions workflow once to populate live inventory.";renderRows();renderCoverage();
+    state.data=null;state.matches=[];$("sourceNote").textContent="Data file unavailable. Run the GitHub Actions workflow once to populate match inventory.";renderRows();renderCoverage();
   }
 }
 $("refresh").addEventListener("click",load);
@@ -201,7 +203,7 @@ $("export").addEventListener("click",function(){
   var csv=[f.join(",")].concat(state.matches.map(function(x){return f.map(function(k){return JSON.stringify(x[k]||"")}).join(",")})).join("\n");
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="betss-sports-match-intelligence.csv";a.click();
 });
-document.querySelectorAll(".tab").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active")});b.classList.add("active");state.range=b.getAttribute("data-range");renderRows()})});
+document.querySelectorAll(".tab").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active")});b.classList.add("active");state.range=b.getAttribute("data-range");render()})});
 $("search").addEventListener("input",renderRows);$("sportFilter").addEventListener("change",renderRows);$("signalFilter").addEventListener("change",renderRows);
 setInterval(function(){$("now").textContent=nowText()+" · IST / SL"},1000);
 load();
