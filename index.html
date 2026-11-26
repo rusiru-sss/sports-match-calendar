@@ -77,7 +77,7 @@ thead th{font-size:11px;color:#a8bad2}tbody td{font-size:13px;padding:13px 11px}
 </section>
 
 <section class="card panel">
-  <div class="head"><div><div class="ptitle">📋 Match inventory</div><div class="psub" id="resultMeta">Loading…</div></div><div class="tabs"><button class="tab active" data-range="today">Today</button><button class="tab" data-range="next7">Next 7 Days</button><button class="tab" data-range="month">Entire Month</button><button class="tab" data-range="nextMonth">Next Month</button></div></div>
+  <div class="head"><div><div class="ptitle">📋 Match inventory</div><div class="psub" id="resultMeta">Loading…</div></div><div class="tabs"><button class="tab active" data-range="today">Today</button><button class="tab" data-range="next7">Next 7 Days</button><button class="tab" data-range="month">Entire Month</button><button class="tab" data-range="nextMonth">Entire Next Month</button></div></div>
   <div class="toolbar"><input class="search" id="search" placeholder="Search teams, players, competition or sport…"><select class="select" id="sportFilter"><option>All Sports</option></select><select class="select" id="signalFilter"><option>All Signals</option><option>Promote</option><option>Consider</option><option>Monitor</option></select></div>
   <div class="table-wrap"><table><thead><tr><th>Date</th><th>Time · IST</th><th>Category</th><th>Tournament</th><th>Match / Event</th><th>Signal</th><th>Score</th></tr></thead><tbody id="rows"></tbody></table></div>
 </section>
@@ -191,7 +191,7 @@ function renderRows(){
     var d=localDate(x.start_time),rangeOk=state.range==="today"?d===today:state.range==="next7"?next7(x.start_time):d.slice(0,7)===month;
     return rangeOk&&x.status!=="finished"&&x.status!=="cancelled"&&(sf==="All Sports"||x.sport===sf)&&(sg==="All Signals"||x.promotion_signal===sg)&&JSON.stringify(x).toLowerCase().indexOf(q)>=0;
   }).sort(function(a,b){return new Date(a.start_time)-new Date(b.start_time)});
-  $("resultMeta").textContent="Showing "+rows.length.toLocaleString()+" individual matches · "+(state.range==="today"?"today":state.range==="next7"?"next 7 days":state.range==="nextMonth"?"next month":"entire current month");
+  $("resultMeta").textContent="Showing "+rows.length.toLocaleString()+" individual matches · "+(state.range==="today"?"today":state.range==="next7"?"next 7 days":state.range==="nextMonth"?nextMonthKey()+" · entire calendar month (available fixtures only)":"entire current month");
   $("rows").innerHTML=rows.length?rows.map(function(x){
     var u=x.source_url?'<a href="'+esc(x.source_url)+'" target="_blank" rel="noreferrer">'+eventName(x)+'</a>':eventName(x);
     return '<tr><td><div class="date-main">'+localDateLabel(x.start_time)+'</div><div class="date-sub">'+localDay(x.start_time)+'</div></td><td><div class="time">'+(x.time_precision==="date_only"?"TBD":localTime(x.start_time))+'</div><div class="tiny">IST / SL</div></td><td><div class="sport-cell">'+(icon[x.sport]||"•")+' '+esc(x.sport)+'</div>'+((x.sport==="Esports"&&(x.game||x.sport_detail))?'<div class="tournament-line">'+esc(x.game||x.sport_detail)+'</div>':'')+'</td><td><div class="comp">'+esc(x.tournament_name||x.competition||"Unknown")+'</div></td><td><div class="event">'+u+'</div></td><td><span class="sig '+sigClass(x.promotion_signal)+'">'+esc(x.promotion_signal)+'</span></td><td><div class="score">'+Math.round(Number(x.promotion_score||0))+'/100</div><span class="why">'+esc((x.promotion_reasons||[]).slice(0,3).join(" · ")||"general inventory")+'</span></td></tr>';
@@ -218,7 +218,7 @@ $("export").addEventListener("click",function(){
   var csv=[f.join(",")].concat(state.matches.map(function(x){return f.map(function(k){return JSON.stringify(x[k]||"")}).join(",")})).join("\n");
   var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="betss-sports-match-intelligence.csv";a.click();
 });
-document.querySelectorAll(".tab").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active")});b.classList.add("active");state.range=b.getAttribute("data-range");render()})});
+document.querySelectorAll(".tab").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active")});b.classList.add("active");state.range=b.getAttribute("data-range");if(state.range==="nextMonth"){$("search").value="";$("sportFilter").selectedIndex=0;$("signalFilter").selectedIndex=0}render()})});
 $("search").addEventListener("input",renderRows);$("sportFilter").addEventListener("change",renderRows);$("signalFilter").addEventListener("change",renderRows);
 $("now").textContent=nowText()+" · IST / SL";
 setInterval(function(){$("now").textContent=nowText()+" · IST / SL"},1000);
