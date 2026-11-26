@@ -1,46 +1,22 @@
 # Sports Match Intelligence
 
-A calendar-first sports-event intelligence dashboard covering **cricket, badminton, tennis, football, boxing, rugby, F1, golf, table tennis and basketball**.
+Static dashboard with a rolling **current month and next month** fixture table.
 
-## Primary sources requested
+## Features
+- Today, Next 7 Days, Entire Month, and Next Month tabs
+- Search, sport and promotion filters, Sri Lanka-local times, CSV export
+- Automated data refresh every 6 hours using GitHub Actions
+- Static deployment to GitHub Pages after a refresh
 
-- Cricket — ESPNcricinfo
-- Football — Sky Sports Football Scores & Fixtures
-- Rugby — Sky Sports Rugby Union Fixtures
-- F1 — Sky Sports F1 Schedule
-- Tennis — Sky Sports Tennis Scores & Schedule
+## Publish
+1. Merge the deployment pull request into `main`.
+2. In **Settings > Pages**, set **Source** to **GitHub Actions**.
+3. In **Actions > Refresh match inventory and deploy site**, choose **Run workflow**.
+4. The site should appear at `https://rusiru-sss.github.io/sports-match-calendar/` when the deployment succeeds.
 
-The full-month inventory is enriched with SofaScore's public scheduled-event feeds so the dashboard can capture lower-profile leagues and sports that are not fully exposed by the requested pages.
+The repository is **private**. Check your plan's GitHub Pages eligibility; alternatively make a public mirror of the non-sensitive site content. The site and exported data are publicly accessible once published.
 
-## What the dashboard does
+## Feed and limitations
+`scripts/build_matches.py` retrieves two rolling calendar months via the TheSportsDB daily public API, normalizes and deduplicates entries, and writes `data/matches.json` as part of each deployment. The free API is **limited coverage**, not a complete fixture inventory. Some sports/months may have few or zero events. For broader coverage, integrate a licensed feed or a compatible premium TheSportsDB key using repository secret `SPORTSDB_API_KEY`. No events are fabricated. Dates without confirmed event times are displayed as TBD.
 
-- Shows **Today / Tomorrow / This Month / Next 7 Days** counts.
-- Shows exact event **date + time** when the provider supplies a timestamp.
-- Uses **Time TBD** rather than inventing a time when a provider only supplies a date.
-- Lets you switch the event table between **Today, Next 7 Days and Entire Month**.
-- Searches teams, players, competitions and sports.
-- Exports the normalized inventory as CSV.
-- Stores normalized data in `data/matches.json`.
-- Deduplicates the same event across providers.
-
-## Setup
-
-1. Open **Settings → Pages** and keep **GitHub Actions** selected as the source.
-2. Open **Actions → Scrape sports and deploy → Run workflow** once.
-3. The workflow refreshes the full target month every 6 hours.
-
-### Optional Firecrawl
-
-The current calendar pipeline does **not require a Firecrawl key**. It uses direct public schedule/score feeds for the monthly inventory. Firecrawl can be added later as an extraction/validation layer for pages that do not expose structured data.
-
-## Target month
-
-The scraper defaults to the runner's current month. To force a month, set the environment variable:
-
-`TARGET_MONTH=2026-10`
-
-This is useful for rebuilding the complete October 2026 inventory.
-
-## Data architecture
-
-Requested sports sites + public schedule feeds → normalized events → deduplication → `data/matches.json` → GitHub Pages dashboard.
+The prior README mentioned a multi-provider scraper and an Actions workflow, but neither existed in the original repository. This version supplies a working baseline, not guaranteed comprehensive match coverage.
