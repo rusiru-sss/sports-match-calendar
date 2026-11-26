@@ -1,22 +1,32 @@
 # Sports Match Intelligence
 
-Static dashboard with a rolling **current month and next month** fixture table.
+A static Sri Lanka-time sports calendar for the current **and next month**, with country flags for recognized international fixtures and a separate bonus policy draft register.
 
-## Features
-- Today, Next 7 Days, Entire Month, and Next Month tabs
-- Search, sport and promotion filters, Sri Lanka-local times, CSV export
-- Automated data refresh every 6 hours using GitHub Actions
-- Static deployment to GitHub Pages after a refresh
+## Free fixture fallback (no API keys)
 
-## Publish
-1. Merge the deployment pull request into `main`.
-2. In **Settings > Pages**, set **Source** to **GitHub Actions**.
-3. In **Actions > Refresh match inventory and deploy site**, choose **Run workflow**.
-4. The site should appear at `https://rusiru-sss.github.io/sports-match-calendar/` when the deployment succeeds.
+The daily collector `scripts/fallback_feeds.py` loads multiple sources and deduplicates overlapping entries. A failure in one source does not prevent other sources from producing events.
 
-The repository is **private**. Check your plan's GitHub Pages eligibility; alternatively make a public mirror of the non-sensitive site content. The site and exported data are publicly accessible once published.
+| Source | Role | Limitations |
+| --- | --- | --- |
+| [Sporting Events](https://sporting-events.org/data/) | Downloadable sport category JSON, including football/cricket/rugby/F1 | Some listings represent competitions rather than individual matches; free with attribution |
+| [SportsEvents24](https://sportsevents24.com/api) | Cricket, soccer, rugby, basketball | Only next 30 days; 100 requests/day, 5,000 records/month, 100 records/page; queried conservatively |
+| [OpenLigaDB](https://www.openligadb.de/) | German football leagues | Not worldwide; database license ODbL |
+| [Jolpica F1](https://github.com/jolpica/jolpica-f1) | Formula 1 season schedules | F1 race events only |
+| ESPN public scoreboard | Additional competition coverage | Unofficial endpoints may change or refuse requests |
+| TheSportsDB public endpoint | Short-range fallback | Limited coverage and requests may fail |
+| Last successful deployed snapshot | Fallback when providers fail | Stale entries are **not** new fixtures |
 
-## Feed and limitations
-`scripts/build_matches.py` retrieves two rolling calendar months via the TheSportsDB daily public API, normalizes and deduplicates entries, and writes `data/matches.json` as part of each deployment. The free API is **limited coverage**, not a complete fixture inventory. Some sports/months may have few or zero events. For broader coverage, integrate a licensed feed or a compatible premium TheSportsDB key using repository secret `SPORTSDB_API_KEY`. No events are fabricated. Dates without confirmed event times are displayed as TBD.
+Coverage is **not guaranteed** for any sport/month. Never interpret a provider returning zero fixtures as confirmation that there are no scheduled matches.
 
-The prior README mentioned a multi-provider scraper and an Actions workflow, but neither existed in the original repository. This version supplies a working baseline, not guaranteed comprehensive match coverage.
+## Automation
+The GitHub Actions workflow runs once daily (03:27 UTC) and on push to main. It verifies Python syntax, fetches fixtures, then deploys the dashboard to GitHub Pages. If zero valid fixtures remain even after checking the last published snapshot, deployment aborts rather than overwriting it with empty data. A provider warning is surfaced on the dashboard; provider metadata is written in `data/matches.json`.
+
+SportsEvents24 allows date ranges only through 30 days ahead; another source must supply fixtures later in next month. We intentionally use fewer requests than the daily public allowance and avoid polling it every six hours.
+
+## GitHub Pages
+Configure **Settings > Pages > Source: GitHub Actions**; merge this branch into main. The site is deployed at https://rusiru-sss.github.io/sports-match-calendar/.
+
+## Legal / editorial
+Respect each feed's access terms and licensing for business use. Data from [Sporting Events](https://sporting-events.org/data/) requires attribution; displayed here and on the dashboard. OpenLigaDB data is offered under ODbL. Public ESPN or other unofficial endpoints do not promise availability or redistribute rights. This is a schedule-planning aid, not a source of live betting odds or guaranteed complete fixtures.
+
+The public `bonus-policy.html` page is **draft documentation only**. Do not include confidential promotional terms or customer details until the site is access protected.
