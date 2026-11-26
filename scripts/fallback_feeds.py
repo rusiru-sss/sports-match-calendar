@@ -128,7 +128,7 @@ def add(source, sport, title, first_team="", second_team="", when=None, precisio
         "participant_2_country_code": cb if international else "",
         "promotion_signal": "Monitor", "promotion_score": 20,
         "promotion_reasons": ["Fixture listed by " + source],
-        "source": source, "source_url": url or "", "source_verified": True,
+        "source": source, "source_url": url or "", "source_verified": source != "previous snapshot",
     })
     h = health.setdefault(source, {"status": "ok", "count": 0, "errors": 0})
     h["count"] += 1
