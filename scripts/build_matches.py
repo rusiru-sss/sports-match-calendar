@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 import requests
 
 BASE = "https://www.thesportsdb.com/api/v1/json"
-KEY = os.getenv("SPORTSDB_API_KEY", "123")
+KEY = os.getenv("SPORTSDB_API_KEY") or "123"
 SPORTS = {"Soccer": "Soccer", "Cricket": "Cricket", "Tennis": "Tennis",
           "Basketball": "Basketball", "Rugby": "Rugby", "Motorsport": "Formula 1",
           "Boxing": "Boxing", "Badminton": "Badminton", "Volleyball": "Volleyball"}
