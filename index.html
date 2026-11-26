@@ -120,8 +120,8 @@ function isPromoCricket(x){
   return promoCountries.some(function(c){return a.indexOf(c.toLowerCase())>=0||b.indexOf(c.toLowerCase())>=0});
 }
 function eventName(x){
-  var f1=flagFor(x.participant_1_country_code,x.participant_1),f2=flagFor(x.participant_2_country_code,x.participant_2);
-  var flags=(x.participant_1||x.participant_2)?'<span class="flags">'+f1+f2+'</span>':'';
+  var f1=x.is_country_match===true?flagFor(x.participant_1_country_code,x.participant_1):"",f2=x.is_country_match===true?flagFor(x.participant_2_country_code,x.participant_2):"";
+  var flags=x.is_country_match===true?'<span class="flags">'+f1+f2+'</span>':'';
   if(x.participant_1&&x.participant_2){
     return flags+esc(x.participant_1)+' <span style="color:#6d819c">vs</span> '+esc(x.participant_2);
   }
@@ -164,7 +164,7 @@ function render(){
   $("monthChart").innerHTML=days.length?days.map(function(d){return '<div class="bar-col"><div class="bar-v">'+dc[d]+'</div><div class="bar" style="height:'+Math.max(4,dc[d]/max*105)+'px"></div><div class="bar-l">'+d.slice(8)+'</div></div>'}).join(""):'<div class="empty-box">No volume data.</div>';
   renderRows();renderCoverage();
   $("updated").textContent="Last refresh "+(state.data&&state.data.generated_at_local?new Intl.DateTimeFormat("en-GB",{timeZone:TZ,dateStyle:"medium",timeStyle:"short"}).format(new Date(state.data.generated_at_local)):"—");
-  if(state.data&&state.data.feed_warnings&&state.data.feed_warnings.length){$("kToday").title="Incomplete provider coverage";$("hero").insertAdjacentHTML("afterbegin",\'<div class="empty-box" style="color:#facc15">Incomplete fixture coverage: provider requests failed. Missing matches do not mean no games are scheduled.</div>\');} $("sourceNote").textContent=state.matches.length.toLocaleString()+" rolling two-month inventory · completed fixtures hidden from lists · TheSportsDB · limited coverage";
+  if(state.data&&state.data.feed_warnings&&state.data.feed_warnings.length){$("kToday").title="Incomplete provider coverage";$("hero").insertAdjacentHTML("afterbegin",\'<div class="empty-box" style="color:#facc15">Incomplete fixture coverage: provider requests failed. Missing matches do not mean no games are scheduled.</div>\');} $("sourceNote").textContent=state.matches.length.toLocaleString()+" rolling two-month inventory · completed fixtures hidden from lists · ESPN + TheSportsDB + SofaScore · partial coverage";
 }
 function populateSports(){
   var list=[...new Set(state.matches.map(function(x){return x.sport}))].sort(function(a,b){if(a==="Cricket")return -1;if(b==="Cricket")return 1;return a.localeCompare(b)});
