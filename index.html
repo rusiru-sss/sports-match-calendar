@@ -23,6 +23,21 @@ button,input,select{font:inherit}.app{max-width:1540px;margin:auto;padding:26px 
 .cover{display:grid;grid-template-columns:1fr 1fr;gap:8px}.source{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px;border:1px solid #233852;background:#0b1628;border-radius:11px}.sl{display:flex;gap:7px;align-items:center}.sdot{width:7px;height:7px;border-radius:50%}.ok{background:var(--good)}.warn{background:var(--warn)}.empty{background:#64748b}.sn{font-size:10px;font-weight:900}.sm{font-size:9px;color:#6e839f}.sc{font-size:11px;font-weight:950}.help{padding:13px;border:1px solid #253a55;border-radius:12px;background:#0b1728;color:#8fa5c1;font-size:10px}.help b{color:#e2efff}.footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:#677d9b;font-size:10px;margin-top:13px}
 .empty-box{padding:26px;text-align:center;color:var(--muted);border:1px dashed #2a4262;border-radius:12px}
 @media(max-width:1120px){.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.app{padding:15px 11px 30px}.top{flex-direction:column}.top-actions{justify-content:flex-start}.kpis{grid-template-columns:1fr 1fr}.hero{grid-template-columns:1fr}.cat-grid,.cover{grid-template-columns:1fr}.title{font-size:23px}.panel{padding:14px}.search{min-width:170px}}
+
+/* Readability and responsive inventory improvements */
+body{font:15px/1.55 "Archivo",system-ui,sans-serif}
+.app{max-width:1600px;padding:24px}
+.label,.eyebrow{font-size:12px;letter-spacing:.07em}
+.subtitle,.kfoot,.psub,.footer{font-size:12px;color:#a8bad2}
+.ptitle{font-size:18px}.value{font-size:38px}
+.kpi{min-height:100px}.panel{padding:20px}
+.tabs{flex-wrap:wrap}.tab{font-size:12px;padding:9px 13px}
+thead th{font-size:11px;color:#a8bad2}tbody td{font-size:13px;padding:13px 11px}
+.date-sub,.tiny,.why,.tournament-line,.hcomp,.sm{font-size:11px;color:#9db0c8}
+.cat-name,.sn,.cat-count{font-size:13px}.hero-card{padding:16px}
+.hero{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.empty-box{grid-column:1/-1;padding:18px;text-align:left}
+@media(max-width:700px){.app{padding:12px}.head{flex-wrap:wrap}.panel{padding:14px}.value{font-size:30px}}
 </style>
 </head>
 <body>
@@ -164,7 +179,7 @@ function render(){
   $("monthChart").innerHTML=days.length?days.map(function(d){return '<div class="bar-col"><div class="bar-v">'+dc[d]+'</div><div class="bar" style="height:'+Math.max(4,dc[d]/max*105)+'px"></div><div class="bar-l">'+d.slice(8)+'</div></div>'}).join(""):'<div class="empty-box">No volume data.</div>';
   renderRows();renderCoverage();
   $("updated").textContent="Last refresh "+(state.data&&state.data.generated_at_local?new Intl.DateTimeFormat("en-GB",{timeZone:TZ,dateStyle:"medium",timeStyle:"short"}).format(new Date(state.data.generated_at_local)):"—");
-  if(state.data&&state.data.feed_warnings&&state.data.feed_warnings.length){$("kToday").title="Incomplete provider coverage";$("hero").insertAdjacentHTML("afterbegin",\'<div class="empty-box" style="color:#facc15">Incomplete fixture coverage: provider requests failed. Missing matches do not mean no games are scheduled.</div>\');} $("sourceNote").textContent=state.matches.length.toLocaleString()+" rolling two-month inventory · completed fixtures hidden from lists · ESPN + TheSportsDB + SofaScore · partial coverage";
+  if(state.data&&state.data.feed_warnings&&state.data.feed_warnings.length){$("kToday").title="Incomplete provider coverage";$("hero").insertAdjacentHTML("afterbegin",'<div class="empty-box" style="color:#facc15">Incomplete fixture coverage: provider requests failed. Missing matches do not mean no games are scheduled.</div>');} $("sourceNote").textContent=state.matches.length.toLocaleString()+" rolling two-month inventory · completed fixtures hidden from lists · ESPN + TheSportsDB + SofaScore · partial coverage";
 }
 function populateSports(){
   var list=[...new Set(state.matches.map(function(x){return x.sport}))].sort(function(a,b){if(a==="Cricket")return -1;if(b==="Cricket")return 1;return a.localeCompare(b)});
@@ -194,7 +209,7 @@ async function load(){
     var r=await fetch("data/matches.json?ts="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("missing");
     state.data=await r.json();state.matches=Array.isArray(state.data)?state.data:(state.data.matches||[]);populateSports();render();
   }catch(e){
-    state.data=null;state.matches=[];$("sourceNote").textContent="Data file unavailable. Run the GitHub Actions workflow once to populate match inventory.";renderRows();renderCoverage();
+    console.error("Dashboard load failed",e);$("sourceNote").textContent="Unable to load or render fixtures: "+e.message;$("resultMeta").textContent="Fixture data unavailable — use Refresh to retry.";
   }
 }
 $("refresh").addEventListener("click",load);
@@ -205,6 +220,7 @@ $("export").addEventListener("click",function(){
 });
 document.querySelectorAll(".tab").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active")});b.classList.add("active");state.range=b.getAttribute("data-range");render()})});
 $("search").addEventListener("input",renderRows);$("sportFilter").addEventListener("change",renderRows);$("signalFilter").addEventListener("change",renderRows);
+$("now").textContent=nowText()+" · IST / SL";
 setInterval(function(){$("now").textContent=nowText()+" · IST / SL"},1000);
 load();
 </script>
